@@ -1,0 +1,1571 @@
+<template>
+  <div class="app-container">
+    <el-form :model="queryParams" ref="queryForm" :inline="true" v-show="showSearch" label-width="68px">
+      <el-form-item label="任务类型" prop="type">
+        <!--<el-select v-model="queryParams.type" placeholder="请选择请假类型" clearable size="small">
+          <el-option label="请选择字典生成" value=""/>
+        </el-select>-->
+        <el-select v-model="queryParams.type"   clearable   placeholder="请选择任务类型" style="margin-left: 10px">
+          <el-option
+            v-for="item in typeList"
+            :key="item.key"
+            :label="item.name"
+            :value="item.key">
+          </el-option>
+        </el-select>
+      </el-form-item>
+      <el-form-item label="标题" prop="title">
+        <el-input
+          v-model="queryParams.title"
+          placeholder="请输入标题"
+          clearable
+          size="small"
+          @keyup.enter.native="handleQuery"
+        />
+      </el-form-item>
+
+      <el-form-item label="流程实例ID" prop="instanceId">
+        <el-input
+          v-model="queryParams.instanceId"
+          placeholder="请输入流程实例ID"
+          clearable
+          size="small"
+          @keyup.enter.native="handleQuery"
+        />
+      </el-form-item>
+      <el-form-item>
+        <el-button type="cyan" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
+        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
+      </el-form-item>
+    </el-form>
+
+    <!--<el-row :gutter="10" class="mb8" v-if="path=='task'">
+      <el-col :span="1.5">
+        <el-button
+          type="primary"
+          icon="el-icon-plus"
+          size="mini"
+          @click="handleAdd"
+          v-hasPermi="['workflow:leave']"
+        >新增
+        </el-button>
+      </el-col>
+      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
+    </el-row>-->
+
+    <el-table v-loading="loading" :data="leaveList" stripe border :header-cell-style="{background:'#336699',color:'#eef1f6'}">
+      <el-table-column label="任务类型" align="center" prop="processName">
+        <!--<template slot-scope="scope">
+          <span v-if="scope.row.processKey === 'document_accept_order'">收文登记</span>
+          <span v-if="scope.row.processKey === 'document_send'">发文拟稿</span>
+          <span v-if="scope.row.processKey === 'document_distribute'">公文分发</span>
+          <span v-if="scope.row.processKey === 'leave'">请假</span>
+          <span v-if="scope.row.processKey === 'partyMemberActivity'">党员活动</span>
+          <span v-if="scope.row.processKey === 'notice'">通知公告</span>
+        </template>-->
+      </el-table-column>
+      <el-table-column label="标题" align="center" prop="title"/>
+      <el-table-column label="原因" align="center" prop="reason"/>
+      <el-table-column label="开始时间" align="center" prop="starttime"/>
+      <el-table-column label="流程实例ID" align="center" prop="instanceId"/>
+      <el-table-column label="申请人" align="center" prop="applyUserName"/>
+      <el-table-column label="任务名称" align="center" prop="taskName"/>
+
+      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+        <template slot-scope="scope">
+          <div v-if="scope.row.instanceId">
+            <el-button
+              size="mini"
+              type="text"
+              icon="el-icon-edit"
+              @click="detail(scope.row)"
+              v-hasPermi="['document:send:task']"
+            >申请详情
+            </el-button>
+            <el-button
+              size="mini"
+              type="text"
+              icon="el-icon-edit"
+              @click="historyList(scope.row)"
+              v-hasPermi="['document:send:task']"
+            >审批历史
+            </el-button>
+            <el-button
+              size="mini"
+              type="text"
+              icon="el-icon-edit"
+              @click="showProcessImgDialog(scope.row)"
+              v-hasPermi="['document:send:task']"
+            >进度查看
+            </el-button>
+            <el-button
+              v-if="scope.row.taskName.indexOf('已挂起') === -1 && path=='todoTask'"
+              size="mini" showFormDialog
+              type="text"
+              icon="el-icon-edit"
+              @click="showVerifyDialog(scope.row)"
+              v-hasPermi="['document:send:task']"
+            >{{scope.row.taskName.indexOf('审批') !== -1?'审批':scope.row.taskName}}
+            </el-button>
+            <div v-if="scope.row.taskName.indexOf('已结束') === -1 && path=='task'">
+              <el-button
+                size="mini"
+                type="text"
+                icon="el-icon-edit"
+                @click="cancelApply(scope.row)"
+                v-hasPermi="['document:send:task']"
+              >撤销
+              </el-button>
+              <el-button
+                size="mini"
+                type="text"
+                icon="el-icon-edit"
+                @click="suspendOrActiveApply(scope.row)"
+                v-hasPermi="['document:send:task']"
+              >{{scope.row.suspendState=== '2' ? '激活' : '挂起'}}
+              </el-button>
+            </div>
+          </div>
+          <!--<div v-else>
+            <el-button
+              size="mini"
+              type="text"
+              icon="el-icon-edit"
+              @click="submitApply(scope.row)"
+              v-hasPermi="['document:send:task']"
+            >提交申请
+            </el-button>
+            <el-button
+              size="mini"
+              type="text"
+              icon="el-icon-edit"
+              @click="handleUpdate(scope.row)"
+              v-hasPermi="['document:send:task']"
+            >修改
+            </el-button>
+            <el-button
+              size="mini"
+              type="text"
+              icon="el-icon-delete"
+              @click="handleDelete(scope.row)"
+              v-hasPermi="['document:send:task']"
+            >删除
+            </el-button>
+          </div>-->
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <pagination
+      v-show="total>0"
+      :total="total"
+      :page.sync="queryParams.pageNum"
+      :limit.sync="queryParams.pageSize"
+      @pagination="getList"
+    />
+
+    <!-- 添加或修改请假流程对话框 -->
+    <el-dialog :title="title" :visible.sync="open" width="800px" append-to-body :before-close="handleClose">
+      <!--请假-->
+      <el-form ref="form" :model="form" :rules="rules" label-width="80px" v-if="form.processKey === 'leave'||form.processKey === 'leave_charge'||form.processKey === 'leave_dept'">
+        <el-form-item label="标题" prop="title" >
+          <el-input v-model="form.title" placeholder="请输入标题" :disabled=readonly></el-input>
+        </el-form-item>
+        <el-form-item label="原因" prop="reason" >
+          <el-input v-model="form.reason" type="textarea" placeholder="请输入内容" :disabled=readonly></el-input>
+        </el-form-item>
+        <el-form-item label="请假类型" v-if="showVerify.ModifyApply">
+          <el-radio-group v-model="form.vacationType">
+            <el-radio label="1">事假</el-radio>
+            <el-radio label="2">病假</el-radio>
+            <el-radio label="3">工休</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="请假类型" prop="vacationStr" v-if="!showVerify.ModifyApply">
+          <el-input v-model="form.vacationStr" :disabled=readonly></el-input>
+        </el-form-item>
+        <el-form-item label="请假时间" prop="startAndEndTime" >
+          <el-date-picker
+            style="width: 380px;height: 36px"
+            v-model="startAndEndTime"
+            type="datetimerange"
+            value-format="yyyy-MM-dd HH:mm:ss"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期" :disabled=readonly>
+          </el-date-picker>
+        </el-form-item>
+        <el-form-item label="请假时长" prop="totalTime" >
+          <el-input v-model="formatDateSub" :disabled="true"/>
+        </el-form-item>
+        <el-form-item label="实际开始时间" prop="realityStartTime" v-if="showVerify.ReportBack">
+          <el-date-picker
+            v-model="form.processParams.DT_realityStartTime"
+            type="datetime"
+            value-format="yyyy-MM-dd HH:mm:ss"
+            placeholder="选择日期时间">
+          </el-date-picker>
+        </el-form-item>
+        <el-form-item label="实际结束时间" prop="realityEndTime" v-if="showVerify.ReportBack ">
+          <el-date-picker
+            v-model="form.processParams.DT_realityEndTime"
+            type="datetime"
+            value-format="yyyy-MM-dd HH:mm:ss"
+            placeholder="选择日期时间">
+          </el-date-picker>
+        </el-form-item>
+
+        <el-form-item label="重新申请" prop="reApply" v-if="showVerify.ModifyApply">
+          <el-radio v-model="form.processParams.B_reApply" label="true" @change="handleSelectChange">重新申请</el-radio>
+          <el-radio v-model="form.processParams.B_reApply" label="false" @change="handleSelectChange">放弃申请</el-radio>
+        </el-form-item>
+
+        <el-form-item label="部门领导审批" prop="deptLeaderApproved" v-if="showVerify.DeptLeaderVerify">
+          <el-radio v-model="form.processParams.B_deptLeaderApproved" label="true" @change="handleSelectChange">同意
+          </el-radio>
+          <el-radio v-model="form.processParams.B_deptLeaderApproved" label="false" @change="handleSelectChange">拒绝
+          </el-radio>
+        </el-form-item>
+
+        <el-form-item label="分管领导审批" prop="chargeApproved" v-if="showVerify.ChargeVerify">
+          <el-radio v-model="form.processParams.B_chargeApproved" label="true" @change="handleSelectChange">同意</el-radio>
+          <el-radio v-model="form.processParams.B_chargeApproved" label="false" @change="handleSelectChange">拒绝</el-radio>
+        </el-form-item>
+        <el-form-item label="领导审批" prop="leaderApproved" v-if="showVerify.LeaderVerify">
+          <el-radio v-model="form.processParams.B_leaderApproved" label="true" @change="handleSelectChange">同意</el-radio>
+          <el-radio v-model="form.processParams.B_leaderApproved" label="false" @change="handleSelectChange">拒绝</el-radio>
+        </el-form-item>
+        <el-form-item label="监察室审批" prop="leaderApproved" v-if="showVerify.Supervision">
+          <div v-if="showFinishFile">
+            <el-button type="info" disabled >归档</el-button>
+            <div slot="tip" class="el-upload__tip" >请点击确定，完成归档</div>
+          </div>
+          <div v-else>
+            <el-button type="primary" @click="finishFile">归档</el-button>
+          </div>
+        </el-form-item>
+
+        <el-form-item label="批注" prop="comment" v-if="showButton&& !(showVerify.ModifyApply||showVerify.ReportBack)">
+          <el-input
+            type="textarea"
+            :rows="3"
+            placeholder="请输入内容"
+            v-model="form.processParams.COM_comment">
+          </el-input>
+        </el-form-item>
+      </el-form>
+
+      <!--党员活动-->
+      <el-form ref="form" :model="form" :rules="rules" label-width="100px" v-if="form.processKey === 'partyMemberActivity'">
+        <el-form-item label="标题" prop="title" >
+          <el-input v-model="form.title" placeholder="请输入标题" :disabled='true'></el-input>
+        </el-form-item>
+        <el-form-item label="开始时间" prop="startTime" >
+          <el-input v-model="form.startTime"  placeholder="请输入内容" :disabled='true'></el-input>
+        </el-form-item>
+        <el-form-item label="简述" prop="display" >
+          <el-input v-model="form.display"  placeholder="请输入内容" :disabled='true'></el-input>
+        </el-form-item>
+        <el-form-item label="应接收党支部" prop="acceptName" >
+          <el-input v-model="form.acceptName"  placeholder="请输入内容" :disabled='true'></el-input>
+        </el-form-item>
+      </el-form>
+
+      <!--发文拟稿-->
+      <el-form ref="form" :model="form"  :rules="rules" label-width="200px" v-if="form.processKey === 'document_send'">
+        <el-form-item label="编号" prop="sendNum" >
+          <el-input v-model="form.sendNum" placeholder="请输入编号" :disabled=readonly></el-input>
+        </el-form-item>
+        <el-form-item label="公文标题" prop="docTitle" >
+          <el-input v-model="form.docTitle" placeholder="请输入标题" :disabled=readonly></el-input>
+        </el-form-item>
+        <el-form-item label="发送时间" prop="sendTime" >
+          <el-input v-model="form.sendTime"  placeholder="请输入发送时间" :disabled='true'></el-input>
+        </el-form-item>
+        <el-form-item  prop="backups1" >
+          <span slot="label">拟稿人【{{form.user}}】意见 </span>
+          <el-input v-model="form.userComment" :disabled="true"/>
+        </el-form-item>
+        <el-form-item prop="chargeLeader" >
+          <span slot="label" v-if="form.charge">主管领导【{{form.charge}}】意见 </span>
+          <span slot="label" v-else>主管领导意见 </span>
+          <el-input v-model="form.chargeComment" :disabled="true"/>
+        </el-form-item>
+        <el-form-item  prop="generalDirector" >
+          <span slot="label" v-if="form.director">综合室主任【{{form.director}}】意见 </span>
+          <span slot="label" v-else>综合室主任意见 </span>
+          <el-input v-model="form.directorComment" :disabled="true"/>
+        </el-form-item>
+        <el-form-item  prop="leader" >
+          <span slot="label" v-if="form.leaderr">领导【{{form.leaderr}}】意见 </span>
+          <span slot="label" v-else>领导意见 </span>
+          <el-input v-model="form.leaderComment" :disabled="true"/>
+        </el-form-item>
+        <el-form-item prop="docAttachment" label="附件" align="center" >
+          <template slot-scope="scope">
+            <el-button type="text" size="small" @click="downloadText(form.docAttachment)">{{annexName}}</el-button>
+          </template>
+        </el-form-item>
+        <el-form-item v-if="showVerify.ReDraft" label="重新上传附件">
+
+          <el-upload
+            class="upload-demo"
+            action="http://222.143.158.1:7005/ruoyi-admin/document/send/file"
+            :on-preview="handlePreview"
+            :on-remove="handleRemove"
+            :before-upload="handleBeforeUpload"
+            multiple
+            :limit="1"
+            accept=".pdf, .doc, .docx, .xls, .xlsx"
+            :on-exceed="handleExceed"
+            :on-success="fileSuccess1"
+            :file-list="fileList">
+            <el-button size="small" type="primary">点击上传</el-button>
+            <div slot="tip" class="el-upload__tip">只能上传Excel、PDF、Word文件，且不超过10MB</div>
+          </el-upload>
+        </el-form-item>
+        <el-form-item label="重新申请" prop="reApply" v-if="showVerify.ReDraft">
+          <el-radio v-model="form.processParams.B_reApproved" label="true" @change="handleSelectChange">重新申请</el-radio>
+          <el-radio v-model="form.processParams.B_reApproved" label="false" @change="handleSelectChange">放弃申请</el-radio>
+        </el-form-item>
+
+        <el-form-item label="审批意见" prop="deptLeaderApproved" v-if="showVerify.Charge"><!--主管领导-->
+          <el-radio v-model="form.processParams.B_chargeApproved" label="true" @change="handleSelectChange">同意
+          </el-radio>
+          <el-radio v-model="form.processParams.B_chargeApproved" label="false" @change="handleSelectChange">拒绝
+          </el-radio>
+        </el-form-item>
+
+        <el-form-item label="审批意见" prop="hrApproved" v-if="showVerify.GeneralAudit"><!--综合室主任-->
+          <el-radio v-model="form.processParams.B_directorApproved" label="true" @change="handleSelectChange">同意</el-radio>
+          <el-radio v-model="form.processParams.B_directorApproved" label="false" @change="handleSelectChange">拒绝</el-radio>
+        </el-form-item>
+
+        <el-form-item label="审批意见" prop="deptLeaderApproved" v-if="showVerify.LeaderIssued"><!--领导-->
+          <el-radio v-model="form.processParams.B_leaderApproved" label="true" @change="handleSelectChange">同意
+          </el-radio>
+          <el-radio v-model="form.processParams.B_leaderApproved" label="false" @change="handleSelectChange">拒绝
+          </el-radio>
+        </el-form-item>
+
+        <el-form-item label="下一步审核人" prop="deptLeaderApproved" v-if="showButton&& (showVerify.Charge||showVerify.GeneralAudit||showVerify.ReDraft)">
+          <span slot="label">{{nextTask}}</span>
+            <!--<el-cascader :options="deptUserList"  :props="{ value:'name',label:'type' }" v-model="form.chargeLeaderList" :show-all-levels="false"  clearable></el-cascader>-->
+          <el-cascader :options="deptUserList" collapse-tags
+                       :props="{ checkStrictly: true,value:'name',label:'type' }"
+                       v-model="form.chargeLeaderList"
+                       clearable  @change="handleChange" >
+          </el-cascader>
+        </el-form-item>
+
+        <el-form-item label="批注" prop="comment" v-if="showButton&& (showVerify.Charge||showVerify.GeneralAudit||showVerify.LeaderIssued)">
+          <el-input
+            type="textarea"
+            :rows="3"
+            placeholder="请输入内容"
+            v-model="form.processParams.COM_comment">
+          </el-input>
+        </el-form-item>
+      </el-form>
+
+      <!--收文登记-->
+      <el-form ref="form" :model="form" :rules="rules" label-width="180px" v-if="form.processKey === 'document_accept_order'">
+        <el-form-item label="编号" prop="sendNum" >
+          <el-input v-model="form.sendNum" placeholder="请输入编号" :disabled=readonly></el-input>
+        </el-form-item>
+        <el-form-item label="事由" prop="docTitle" >
+          <el-input v-model="form.docTitle" placeholder="请输入标题" :disabled=readonly></el-input>
+        </el-form-item>
+        <el-form-item label="收文时间" prop="sendTime" >
+          <el-input v-model="form.sendTime"  placeholder="请输入发送时间" :disabled=readonly></el-input>
+        </el-form-item>
+        <el-form-item label="来文机关" prop="sendCompany" >
+          <el-input v-model="form.sendCompany" :disabled="true"/>
+        </el-form-item>
+
+        <el-form-item  prop="deal" >
+          <span slot="label" v-if="form.deal">拟办人【{{form.deal}}】意见 </span>
+          <span slot="label" v-else>拟办人意见 </span>
+          <el-input v-model="form.dealComment" :disabled="true"/>
+        </el-form-item>
+        <el-form-item prop="leader" >
+          <span slot="label" v-if="form.leader">领导【{{form.leader}}】批示 </span>
+          <span slot="label" v-else>领导批示 </span>
+          <el-input v-model="form.leaderComment" :disabled="true"/>
+        </el-form-item>
+        <el-form-item  prop="readers" v-for="(item,i) in form.readers" :key="i">
+          <span slot="label" v-if="form.readers">阅者【{{item}}】意见 </span>
+          <span slot="label" v-else>阅者意见 </span>
+          <el-input v-model="form.opinions[i]" :disabled="true"  v-if="form.readers"/>
+        </el-form-item>
+        <el-form-item prop="docAttachment" label="附件" align="center" >
+          <template slot-scope="scope">
+            <el-button type="text" size="small" @click="downloadText(form.docAttachment)">{{annexName}}</el-button>
+          </template>
+        </el-form-item>
+
+        <el-form-item label="领导批示" prop="leaderApproved" v-if="showVerify.LeaderInstruct">
+          <el-radio v-model="form.processParams.B_leaderApproved" label="true" @change="handleSelectChange">同意
+          </el-radio>
+          <el-radio v-model="form.processParams.B_leaderApproved" label="false" @change="handleSelectChange">拒绝
+          </el-radio>
+        </el-form-item>
+        <el-form-item label="重新申请" prop="reApply" v-if="showVerify.ReRegister">
+          <el-radio v-model="form.processParams.B_reApply" label="true" @change="handleSelectChange">重新申请</el-radio>
+          <el-radio v-model="form.processParams.B_reApply" label="false" @change="handleSelectChange">放弃申请</el-radio>
+        </el-form-item>
+        <el-form-item label="下一步审核人" prop="deptLeaderApproved" v-if="showButton&& (showVerify.Deal||showVerify.ReRegister)">
+        <span slot="label">{{nextTask}}</span>
+        <el-cascader :options="deptUserList" collapse-tags
+                     :props="{ checkStrictly: true,value:'name',label:'type' }"
+                     v-model="form.chargeLeaderList"
+                     clearable  >
+        </el-cascader>
+      </el-form-item>
+
+        <el-form-item label="下一步审核人" prop="deptLeaderApproved" v-if="showButton&& showVerify.LeaderInstruct">
+          <span slot="label">{{nextTask}}</span>
+          <el-cascader :options="deptUserList" collapse-tags
+                       :props="{multiple: true , checkStrictly: true,value:'name',label:'type' }"
+                       v-model="form.chargeLeaderList"
+                       clearable  @change="handleChange" >
+          </el-cascader>
+        </el-form-item>
+        <el-form-item label="拟办意见" prop="deptLeaderApproved" v-if="showVerify.Deal">
+          <el-input
+            type="textarea"
+            :rows="3"
+            placeholder="请输入内容"
+            v-model="form.processParams.COM_comment">
+          </el-input>
+        </el-form-item>
+        <el-form-item label="领导批示" prop="hrApproved" v-if="showVerify.LeaderInstruct">
+          <el-input
+            type="textarea"
+            :rows="3"
+            placeholder="请输入内容"
+            v-model="form.processParams.COM_comment">
+          </el-input>
+        </el-form-item>
+
+        <el-form-item label="阅者意见" prop="comment" v-if="showVerify.Reader">
+          <el-input
+            type="textarea"
+            :rows="3"
+            placeholder="请输入内容"
+            v-model="form.processParams.COM_comment">
+          </el-input>
+        </el-form-item>
+      </el-form>
+      <!--通知公告-->
+      <el-form ref="form" :model="form" :rules="rules" label-width="200px" v-if="form.processKey === 'notice'||form.processKey === 'notice_internal'">
+        <el-form-item label="通知" prop="docTitle" >
+          <el-input v-model="form.docTitle" placeholder="请输入标题" :disabled=readonly></el-input>
+        </el-form-item>
+
+        <el-form-item label="发布单位" prop="sendCompany" >
+          <el-input v-model="form.sendCompany" :disabled="true"/>
+        </el-form-item>
+        <el-form-item prop="charge" >
+          <span slot="label" v-if="form.charger">分管领导【{{form.charger}}】意见 </span>
+          <span slot="label" v-else>领导批示 </span>
+          <el-input v-model="form.chargeComment" :disabled="true"/>
+        </el-form-item>
+        <el-form-item prop="director" >
+          <span slot="label" v-if="form.director">综合室【{{form.director}}】意见 </span>
+          <span slot="label" v-else>综合室意见 </span>
+          <el-input v-model="form.directorComment" :disabled="true"/>
+        </el-form-item>
+        <el-form-item label="查收通知人" prop="acceptCompany" >
+
+          <el-cascader v-if="showVerify.Renotice" :options="deptUserList"
+                       :props="{multiple: true , checkStrictly: true,value:'name',label:'type' }"
+                       v-model="form.chargeLeaderList"
+                       clearable  style="width: 100%"   @change="myChange">
+          </el-cascader>
+          <el-input v-else v-model="form.acceptName" :disabled="true"/>
+        </el-form-item><!--这里需要加一个三级回显以供修改  v-if="showVerify.Renotice"-->
+        <el-form-item label="通知内容" prop="docRemark" >
+          <!--<el-input type="textarea" v-model="form.docRemark" v-if="readonly" />-->
+          <!--<p v-if="readonly === true|| readonly==='true'" id="myFont"></p>-->
+          <div v-html="myFontDocRemark" v-if="readonly === true || readonly === 'true'"></div>
+          <editor v-model="form.docRemark" :min-height="192" v-if="readonly === false|| readonly==='false'"/>
+
+        </el-form-item>
+        <el-form-item label="通知时间" prop="sendTime" >
+          <el-input v-model="form.sendTime"  placeholder="请输入发送时间" :disabled=readonly></el-input>
+        </el-form-item>
+        <el-form-item prop="docAttachment" label="附件" align="center" v-if="annexName !== ''">
+          <template slot-scope="scope">
+            <el-button type="text" size="small" @click="downloadText(form.docAttachment)" >{{annexName}}</el-button>
+            <div class="itd" style="width:100%;margin-top: 12px;margin-bottom: 12px;margin-left: -200px" v-if="showVerify.Renotice">
+              <el-upload
+                class="upload-demo"
+                action="http://222.143.158.1:7005/ruoyi-admin/document/send/file"
+                :on-preview="handlePreview"
+                :on-remove="handleRemove"
+                :before-upload="handleBeforeUpload"
+                multiple
+                :limit="1"
+                accept=".pdf, .doc, .docx, .xls, .xlsx"
+                :on-exceed="handleExceed"
+                :on-success="fileSuccess"
+                :file-list="fileList">
+                <el-button size="small" type="primary">重新上传</el-button>
+                <div slot="tip" class="el-upload__tip">只能上传Excel、PDF、Word文件，且不超过10MB</div>
+              </el-upload>
+            </div>
+
+          </template>
+        </el-form-item>
+        <el-form-item label="重新申请" prop="reApply" v-if="showVerify.Renotice">
+          <el-radio v-model="form.processParams.B_reApproved" label="true" @change="handleSelectChange">重新申请</el-radio>
+          <el-radio v-model="form.processParams.B_reApproved" label="false" @change="handleSelectChange">放弃申请</el-radio>
+        </el-form-item>
+        <el-form-item label="下一步审核人" prop="deptLeaderApproved" v-if="showButton&&showVerify.Charge&&form.processKey==='notice'">
+          <span slot="label">{{nextTask}}</span>
+          <el-cascader :options="deptUserList" collapse-tags
+                       :props="{ checkStrictly: true,value:'name',label:'type' }"
+                       v-model="form.chargeLeaderList"
+                       clearable  @change="handleChange">
+          </el-cascader>
+        </el-form-item>
+
+        <el-form-item label="分管领导审批" prop="chargeApproved" v-if="showVerify.Charge">
+          <el-radio v-model="form.processParams.B_chargeApproved" label="true" @change="handleSelectChange">同意
+          </el-radio>
+          <el-radio v-model="form.processParams.B_chargeApproved" label="false" @change="handleSelectChange">拒绝
+          </el-radio>
+        </el-form-item>
+
+        <el-form-item label="综合室审批" prop="directorApproved" v-if="showVerify.GeneralAudit">
+          <el-radio v-model="form.processParams.B_directorApproved" label="true" @change="handleSelectChange">同意</el-radio>
+          <el-radio v-model="form.processParams.B_directorApproved" label="false" @change="handleSelectChange">拒绝</el-radio>
+        </el-form-item>
+
+        <el-form-item label="批注" prop="comment" v-if="showButton&& (showVerify.Renotice||showVerify.Charge||showVerify.GeneralAudit)">
+          <el-input
+            type="textarea"
+            :rows="3"
+            placeholder="请输入内容"
+            v-model="form.processParams.COM_comment">
+          </el-input>
+        </el-form-item>
+      </el-form>
+
+      <!--公文分发-->
+      <el-form ref="form" :model="form" :rules="rules" label-width="80px" v-if="form.processKey === 'document_distribute'">
+        <el-form-item label="公文分发编号" prop="sendNum" >
+          <el-input v-model="form.sendNum" placeholder="请输入编号" :disabled=readonly></el-input>
+        </el-form-item>
+        <el-form-item label="公文标题" prop="docTitle" >
+          <el-input v-model="form.docTitle" placeholder="请输入标题" :disabled=readonly></el-input>
+        </el-form-item>
+        <el-form-item label="签发人" prop="backups2" >
+          <el-input v-model="form.backups2" :disabled="true"/>
+        </el-form-item>
+        <el-form-item label="发送时间" prop="sendTime" >
+          <el-input v-model="form.sendTime"  placeholder="请输入发送时间" :disabled=readonly></el-input>
+        </el-form-item>
+        <el-form-item label="收文单位" prop="acceptName" >
+          <el-input v-model="form.acceptName" :disabled="true"/>
+        </el-form-item>
+
+        <el-form-item prop="docAttachment" label="附件" align="center"  v-if="annexName !== ''">
+          <template slot-scope="scope">
+            <el-button type="text" size="small" @click="downloadText(form.docAttachment)">{{annexName}}</el-button>
+          </template>
+        </el-form-item>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button type="primary" @click="submitShowVerifyDialog" v-show="showButton1&&!showButton&&!showButton2">查收通知</el-button>
+        <el-button type="primary" @click="submitShowVerifyDialog1" v-show="showButton2&&!showButton&&!showButton1">公文签收</el-button>
+        <el-button type="primary" @click="submitShowVerifyDialog" v-show="showButton&&!showButton2&&!showButton1">确 定</el-button>
+
+        <el-button type="primary" @click="submitForm" v-show=!readonly&&!showButton&&!showButton2&&!showButton1>确 定</el-button>
+        <el-button @click="cancel">取 消</el-button>
+      </div>
+    </el-dialog>
+    <!--审批历史-->
+    <el-dialog title="审批历史" :visible.sync="dialogTableVisible" width="1000px">
+      <ApprovalHistory :instanceId="instanceId"></ApprovalHistory>
+      <div slot="footer" class="dialog-footer">
+        <el-button @click="cancel">取 消</el-button>
+      </div>
+    </el-dialog>
+
+    <el-dialog title="查看进度" :visible.sync="processImg"  width="1200px">
+      <ProcessImg :instanceId="instanceId"></ProcessImg>
+      <div slot="footer" class="dialog-footer">
+        <el-button @click="cancel">取 消</el-button>
+      </div>
+    </el-dialog>
+  </div>
+</template>
+
+<script>
+  import {
+    getDeptUserTitele,
+    listLeave,
+    getLeave,
+    getLeave1,
+    getDeptUser,
+    delLeave,
+    addLeave,
+    updateLeave,
+    updateNotice,
+    updateAccept,
+    updateSend,
+    exportLeave,
+    submitApply,
+    taskDoneList,
+    taskList,
+    getTypeList,
+    fileDownload,
+    finishArchive
+  } from '@/api/document/task'
+  import Editor from '@/components/Editor';
+  import {cancelApply, suspendOrActiveApply, showVerifyDialog, complete,complete1} from '@/api/activiti/process'
+  import {calcTotalSecond, formatTotalDateSub} from '@/utils/dateUtil'
+  import ApprovalHistory from '@/components/activiti/approvalHistory'
+  import ProcessImg from '@/components/activiti/processImg'
+
+  export default {
+    components: {ApprovalHistory, ProcessImg,Editor},
+    name: 'TodoTask',
+    data() {
+      return {
+        checkList:[''],
+        annexUrl:'',
+        annexName:'',//附件名
+        deptUserList:[],//下一步审核人
+        nextTask:'',//下一步审核人标题
+        typeList:[],//任务类型
+        // 审批确定按钮
+        showButton: false,
+        showButton1: false,
+        showButton2: false,
+        rowId:'',
+        // 审批人控制表单
+        showVerify: {
+          Deal:false,
+          LeaderInstruct:false,
+          AcceptActivity:false,
+          WaitAccept:false,
+          Reader:false,
+          ReDraft:false,
+          ModifyApply: false,
+          DeptLeaderVerify: false,
+          ChargeVerify: false,
+          Supervision:false,
+          LeaderVerify:false,
+          ReportBack: false,
+          Charge:false,
+          GeneralAudit:false,
+          LeaderIssued:false,
+          Sign:false,
+          Renotice:false,
+          Register:false,
+        },
+        // 路径
+        path: '',
+        // 查询方法
+        getLeaveList: null,
+
+        //流程图窗口开关
+        processImg: false,
+        //审批历史窗口开关
+        dialogTableVisible: false,
+        //历史审批窗口参数
+        instanceId: '',
+
+        // 请假时长
+        formatDateSub: '',
+        startAndEndTime: ['', ''],
+        readonly: false,
+        myReApply:false,
+        // 遮罩层
+        loading: true,
+        // 选中数组
+        ids: [],
+        // 非单个禁用
+        single: true,
+        // 非多个禁用
+        multiple: true,
+        // 显示搜索条件
+        showSearch: true,
+        // 总条数
+        total: 0,
+        // 请假流程表格数据
+        leaveList: [],
+        // 弹出层标题
+        title: '',
+        // 是否显示弹出层
+        open: false,
+        //详情
+        detailQuery : {
+          businessKey :'',
+          processKey : '',
+        },
+        // 查询参数
+        queryParams: {
+          pageNum: 1,
+          pageSize: 10,
+          type: null,
+          title: null,
+          reason: null,
+          leaveStartTime: null,
+          leaveEndTime: null,
+          totalTime: null,
+          instanceId: null,
+          applyUser: null,
+          applyTime: null,
+          realityStartTime: null,
+          realityEndTime: null,
+          processParams:{},
+          processKey:null,
+
+        },
+        // 表单参数
+        form: {
+          docTitle:'',
+          sendNum:'',
+          title:'',
+          reason:'',
+          processParams: {},
+          chargeLeaderList:[],
+        },
+        showFinishFile:false,
+        myFontData:'',
+        myFontDocRemark:'',
+        // 表单校验
+        rules: {
+          title: [
+            {required: true, message: '用户名称不能为空', trigger: 'blur'}
+          ], totalTime: [
+            {required: true, message: '请假时间不能为空', trigger: 'blur'}
+          ], reason: [
+            {required: true, message: '原因不能为空', trigger: 'blur'}
+          ],
+         /* realityStartTime: [
+            { type: 'date', required: true, message: '请选择日期', trigger: 'change' }
+          ], realityEndTime: [
+            { type: 'date', required: true, message: '请选择日期', trigger: 'change' }
+          ]*/
+        }
+      }
+    },
+    created() {
+
+      const path = this.$route.path.split('/').pop()
+      this.path = path
+      if ('task' == path) {
+        // this.getLeaveList = listLeave
+        listLeave(this.queryParams).then(response => {
+          this.leaveList = response.rows
+          this.total = response.total
+          this.loading = false
+        })
+      } else if ('todoTask' == path) {
+        // this.getLeaveList = taskList
+        taskList(this.queryParams).then(response => {
+          this.leaveList = response.rows
+          this.total = response.total
+          this.loading = false
+        })
+      } else if ('doneTask' == path) {
+        taskDoneList(this.queryParams).then(response => {
+          this.leaveList = response.rows
+          this.total = response.total
+          this.loading = false
+        })
+        this.reset();
+      }
+
+      getTypeList().then(response => {
+        if (response.code === 200) {
+          this.typeList = response.data
+        }
+      })
+      // this.getList()
+    },
+    methods: {
+      handleChange() {
+        console.log('我红辣椒可垃圾分类看到',this.form.chargeLeaderList)
+      },
+//下载附件
+      downloadText(data){
+        fileDownload(data);
+      },
+      submitShowVerifyDialog() {
+        this.$refs['form'].validate(valid => {
+          if (valid) {
+            if(this.showVerify.Charge){
+               if (this.form.processKey === 'notice_internal') {
+                 this.form.processParams.LIST_signList = this.form.acceptCompany;
+               }else{
+                 console.log('biuhn耨喝奶粉GV')
+                 if (this.form.processParams.B_chargeApproved === "true" || this.form.processParams.B_chargeApproved === true) {
+                   if(this.form.chargeLeaderList.length!== 0){
+                     this.form.processParams.generalDirector = this.form.chargeLeaderList[this.form.chargeLeaderList.length-1];
+                   }else {
+                     this.$message({
+                       message: '请选择下一步办理人哦！',
+                       type: 'warning'
+                     });
+                     return;
+                   }
+                 }
+
+               }
+            }else if(this.showVerify.GeneralAudit){//综合室审核
+              if (this.form.processKey === 'notice') {
+                this.form.processParams.LIST_signList = this.form.acceptCompany;
+              }else{
+                if(this.form.processParams.B_directorApproved === true|| this.form.processParams.B_directorApproved === 'true'){
+                  if (this.form.chargeLeaderList.length!== 0){
+                    this.form.processParams.leader = this.form.chargeLeaderList[this.form.chargeLeaderList.length-1];
+                  } else {//下一步领导
+                    this.$message({
+                      message: '请选择下一步办理人哦！',
+                      type: 'warning'
+                    });
+                    return;
+                  }
+                }
+              }
+            }else if(this.showVerify.Deal){
+              this.form.processParams.leaderUserId = this.form.chargeLeaderList[this.form.chargeLeaderList.length-1];
+            }else if(this.showVerify.LeaderInstruct){
+              let listData = '';
+              let ll = '';
+              console.log('规划的股份',this.form.chargeLeaderList)
+              if(this.form.processParams.B_leaderApproved === true|| this.form.processParams.B_leaderApproved === 'true'){
+                for(let i = 0 ; i <this.form.chargeLeaderList.length;i++){
+                  if(this.form.chargeLeaderList[i].length!== 0){
+                    ll = this.form.chargeLeaderList[i].length
+                    listData = this.form.chargeLeaderList[i][ll-1] + ','+ listData;
+                  }
+                }
+                listData= listData.substring(0,listData.length - 1);
+                this.form.processParams.LIST_readerList = listData;
+              }
+
+            }else if(this.showVerify.ReDraft){//重新申请
+              console.log('还很厉害')
+              if(this.form.processParams.B_reApproved === true|| this.form.processParams.B_reApproved === 'true'){
+                if (this.form.chargeLeaderList.length!== 0){
+                  this.form.processParams.chargeLeader = this.form.chargeLeaderList[this.form.chargeLeaderList.length-1];
+                } else {
+                  this.$message({
+                    message: '请选择下一步办理人哦！',
+                    type: 'warning'
+                  });
+                  return;
+                }
+              }
+            }else if(this.showVerify.ReRegister){//重新申请
+              console.log('还很厉害')
+              if(this.form.processParams.B_reApply === true|| this.form.processParams.B_reApply === 'true'){
+                if (this.form.chargeLeaderList.length!== 0){
+                  this.form.processParams.dealUserId = this.form.chargeLeaderList[this.form.chargeLeaderList.length-1];
+                } else {
+                  this.$message({
+                    message: '请选择下一步办理人哦！',
+                    type: 'warning'
+                  });
+                  return;
+                }
+              }
+            }else if(this.showVerify.Supervision){
+              this.form.processParams.TIME_leaveTime = this.formatDateSub;
+            }
+            this.form.businessKey = this.form.id;
+            if(this.annexUrl!==''){
+              this.form.docAttachment = this.annexUrl;
+            }
+            complete(this.form).then(response => {
+              if (response.code === 200) {
+                console.log('建行卡连接的覆盖率',this.form)
+                // return;
+                let that2 = this;
+                console.log('qwrdedf',that2.form)
+                if (this.showVerify.ModifyApply) {
+
+                  updateLeave(that2.form).then(response => {
+                    if (response.code === 200) {
+                      that2.msgSuccess('修改成功');
+                      that2.open = false;
+                      that2.getList()
+                    }
+                  })
+                }else if(this.showVerify.Renotice && this.form.processParams.B_reApproved){
+                  let that1 = this;
+                  updateNotice(that1.form).then(response => {
+                    if (response.code === 200) {
+                      this.msgSuccess('修改成功');
+                      this.open = false;
+                      this.getList()
+                    }
+                  })
+                }else if(this.showVerify.ReRegister && this.form.processParams.B_reApply){
+                  updateAccept(this.form).then(response => {
+                    if (response.code === 200) {
+                      this.msgSuccess('修改成功');
+                      this.open = false;
+                      this.getList()
+                    }
+                  })
+                }else if(this.showVerify.ReDraft && this.form.processParams.B_reApproved){
+                  updateSend(this.form).then(response => {
+                    if (response.code === 200) {
+                      this.msgSuccess('修改成功');
+                      this.open = false;
+                      this.getList()
+                    }
+                  })
+                } else {
+                  this.msgSuccess('操作成功')
+                  this.open = false;
+                  this.getList()
+                }
+                setTimeout(() => {
+                  this.reset()
+                }, 100)
+              }
+            })
+          }
+        })
+      },
+      myChange(val){
+        console.log('及科技馆我我浪费的两个',val)
+      },
+      submitShowVerifyDialog1() {
+        this.$refs['form'].validate(valid => {
+          if (valid) {
+            this.form.businessKey = this.form.id
+            complete1(this.form).then(response => {
+              if (response.code === 200) {
+                this.msgSuccess('操作成功')
+                this.open = false;
+                this.getList()
+                this.reset()
+              }
+            })
+          }
+        })
+      },
+      // 审批菜单控制
+      showVerifyDialog(row) {
+
+
+        this.reset();
+        this.showButton = true
+        this.showButton1 = false
+        this.showButton2 = false
+      if(row.processKey === 'leave'){
+        getLeave1(row.id).then(response => {
+          this.rowId = row.id;
+          this.form = response.data
+          this.startAndEndTime = [this.form.leaveStartTime, this.form.leaveEndTime]
+          showVerifyDialog(row.taskId).then(response => {
+            console.log(response.msg)
+            if ('ModifyApply' === response.msg) {
+              this.readonly = false
+              this.showVerify.ModifyApply = true;
+              this.form.processParams.B_reApply = "true";
+            } else {
+              if ('ChargeVerify' === response.msg) {
+                this.showVerify.ChargeVerify = true;
+                this.form.processParams.B_chargeApproved = "true";
+              } else if ('DeptLeaderVerify' === response.msg) {
+                this.showVerify.DeptLeaderVerify = true;
+                this.form.processParams.B_deptLeaderApproved = "true";
+              } else if ('ReportBack' === response.msg) {
+                this.showVerify.ReportBack = true;
+              } else if ('LeaderVerify' === response.msg) {
+                this.showVerify.LeaderVerify = true;
+                this.form.processParams.B_leaderApproved = "true";
+              } else if ('Supervision' === response.msg) {
+                this.showVerify.Supervision = true;
+                this.startAndEndTime = [this.form.realityStartTime, this.form.realityEndTime]
+              }
+              this.readonly = true
+            }
+            this.open = true;
+            this.title = row.taskName
+          })
+        })
+      }else{
+        this.detailQuery.businessKey = row.id;
+        this.detailQuery.processKey = row.processKey;
+        getLeave(this.detailQuery).then(response => {
+          this.form = response.data;
+          let aaa = ''
+          if(this.form.processKey ===  'notice' || this.form.processKey ===  'notice_internal'){
+            aaa = response.data.backups4;
+          }
+          this.startAndEndTime = [this.form.leaveStartTime, this.form.leaveEndTime]
+          showVerifyDialog(row.taskId).then(response => {
+            console.log(response.msg)
+            if ('ReDraft' === response.msg) {
+              this.myReApply = false
+              this.showVerify.ReDraft = true;
+              this.readonly = false
+              this.form.processParams.B_reApproved = "true";
+            }else if('Renotice' === response.msg){//Renotice
+              this.myReApply = false
+              this.showVerify.Renotice = true;
+              this.form.chargeLeaderList = eval('(' + aaa + ')');
+              this.readonly = false
+              this.form.processParams.B_reApproved = "true";
+            }else if('ReRegister' === response.msg){//Renotice
+              this.myReApply = false
+              this.showVerify.ReRegister = true;
+              this.readonly = false
+              this.form.processParams.B_reApply = "true";
+            } else {
+              if ('Charge' === response.msg) {
+                this.showVerify.Charge = true;
+                this.form.processParams.B_chargeApproved = "true";
+              } else if ('GeneralAudit' === response.msg) {
+                this.showVerify.GeneralAudit = true;
+                this.form.processParams.B_directorApproved = "true";
+              } else if ('LeaderIssued' === response.msg) {
+                this.showVerify.LeaderIssued = true;
+                this.form.processParams.B_leaderApproved = "true";
+              } else if ('ReportBack' === response.msg) {
+                this.showVerify.ReportBack = true;
+              } else if ('Deal' === response.msg) {
+                this.showVerify.Deal = true;
+              } else if ('LeaderInstruct' === response.msg) {
+                this.showVerify.LeaderInstruct = true;
+              } else if ('Reader' === response.msg) {
+                this.showVerify.Reader = true;
+              }else if ('Sign' === response.msg) {
+                this.showButton1 = true;
+                this.showButton = false;
+                this.showButton2 = false;
+              }else if ('AcceptActivity' === response.msg) {
+                this.showButton1 = true;
+                this.showButton = false;
+                this.showButton2 = false;
+              }else if ('WaitAccept' === response.msg) {
+                this.showButton2 = true;
+                this.showButton = false;
+                this.showButton1 = false;
+              }
+              this.myReApply = true;
+              this.readonly = true
+            }
+
+      if(this.form.docAttachment)
+      this.annexName = this.form.docAttachment.substring(this.form.docAttachment.lastIndexOf("/")+1);
+            this.open = true;
+            this.title = row.taskName;
+            //获取下一步审核人标题
+            getDeptUserTitele(row.processKey,response.msg).then(resp=>{
+              this.nextTask = resp.data.nextTask;
+            })
+          })
+          getDeptUser().then(res=>{
+            this.deptUserList = res;
+          })
+        })
+
+
+      }
+
+      },
+      /** 历史列表 */
+      historyList(row) {
+        this.dialogTableVisible = true
+        this.instanceId = row.instanceId
+      },
+      /** 查询请假流程列表 */
+      getList() {
+        this.loading = true
+        if ('task' == this.path) {
+          // this.getLeaveList = listLeave
+          listLeave(this.queryParams).then(response => {
+            this.leaveList = response.rows
+            this.total = response.total
+            this.loading = false
+          })
+        } else if ('todoTask' == this.path) {
+          // this.getLeaveList = taskList
+          taskList(this.queryParams).then(response => {
+            this.leaveList = response.rows
+            this.total = response.total
+            this.loading = false
+          })
+        } else if ('doneTask' == this.path) {
+          // this.getLeaveList = taskDoneList
+          taskDoneList(this.queryParams).then(response => {
+            this.leaveList = response.rows
+            this.total = response.total
+            this.loading = false
+          })
+        }
+
+      },
+      handleClose(){
+        this.showFinishFile = false;
+        this.open = false;
+      },
+      // 取消按钮
+      cancel() {
+        this.open = false;
+        this.dialogTableVisible = false
+        this.processImg = false
+        this.showButton = false
+        this.showButton1 = false
+        this.showButton2 = false
+        this.reset()
+
+      },
+      // 表单重置
+      reset() {
+        this.showButton = false
+        this.showButton1 = false
+        this.showButton2 = false
+        this.form = {
+          id: null,
+          type: null,
+          title: null,
+          reason: null,
+          leaveStartTime: null,
+          leaveEndTime: null,
+          totalTime: null,
+          instanceId: null,
+          createBy: null,
+          createTime: null,
+          updateBy: null,
+          updateTime: null,
+          applyUser: null,
+          applyTime: null,
+          realityStartTime: null,
+          realityEndTime: null,
+          processParams: {}
+        }
+        this.startAndEndTime = ['', '']
+        this.formatDateSub = null
+        this.resetForm('form')
+        this.instanceId = ''
+        this.showVerify = {
+          Deal:false,
+          LeaderInstruct:false,
+          AcceptActivity:false,
+          WaitAccept:false,
+          Reader:false,
+          ReDraft:false,
+          ModifyApply: false,
+          DeptLeaderVerify: false,
+          ChargeVerify: false,
+          Supervision:false,
+          LeaderVerify:false,
+          ReportBack: false,
+          Charge:false,
+          GeneralAudit:false,
+          LeaderIssued:false,
+          Sign:false,
+          Renotice:false,
+          Register:false,
+        }
+      },
+      /** 搜索按钮操作 */
+      handleQuery() {
+        if(this.queryParams.type){
+          this.queryParams.processParams.typeList = [this.queryParams.type]
+        }
+        this.queryParams.pageNum = 1
+        this.getList()
+      },
+      /** 重置按钮操作 */
+      resetQuery() {
+        this.resetForm('queryForm');
+        this.queryParams.type = '';
+        this.queryParams.processParams = {};
+        // this.handleQuery()
+        this.queryParams.pageNum = 1
+        this.getList()
+      },
+      /** 新增按钮操作 */
+      handleAdd() {
+        this.reset()
+        this.open = true
+        this.readonly = false
+        this.title = '添加请假流程'
+      },
+      /** 修改按钮操作 */
+      handleUpdate(row) {
+        this.reset();
+        /*let query ={
+          businessKey : row.id,
+          processKey : row.processKey,
+        }*/
+        this.detailQuery.businessKey = row.id;
+        this.detailQuery.processKey = row.processKey;
+        getLeave(this.detailQuery).then(response => {
+          this.form = response.data
+          this.startAndEndTime = [this.form.leaveStartTime, this.form.leaveEndTime]
+          this.open = true
+          this.readonly = false
+          this.title = '修改请假流程'
+        })
+      },
+      submitApply(row) {
+        this.$confirm('确认要提交申请吗?', '警告', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }).then(function () {
+          return submitApply(row.id)
+        }).then(() => {
+          this.getList()
+          this.msgSuccess('提交成功')
+        }).catch(function () {
+        })
+      },
+      cancelApply(row) {
+        this.$confirm('确认要撤销申请吗?', '警告', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }).then(function () {
+          return cancelApply(row.instanceId)
+        }).then(() => {
+          this.getList()
+         /* if ('task' == this.path) {
+            listLeave(this.queryParams).then(response => {
+              this.leaveList = response.rows
+              this.total = response.total
+              this.loading = false
+            })
+
+          }*/
+          this.msgSuccess('撤销成功')
+        }).catch(function () {
+        })
+      },
+      suspendOrActiveApply(row) {
+        var suspendOrActive = row.suspendState === '2' ? '激活' : '挂起'
+        this.$confirm('确认要' + suspendOrActive + '申请吗?', '警告', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }).then(function () {
+          const data = {'instanceId': row.instanceId, 'suspendState': row.suspendState}
+          return suspendOrActiveApply(data)
+        }).then(() => {
+          this.getList()
+          this.msgSuccess('撤销成功')
+        }).catch(function () {
+        })
+      },
+      /** 表单数据展示 */
+      detail(row) {
+        this.reset()
+        this.annexName = '';
+        this.detailQuery.businessKey = row.id;
+        this.detailQuery.processKey = row.processKey;
+        getLeave(this.detailQuery).then(response => {
+          this.form = response.data
+          this.startAndEndTime = [this.form.leaveStartTime, this.form.leaveEndTime]
+          if(this.form.docAttachment && this.form.docAttachment!== null){
+            this.annexName = this.form.docAttachment.substring(this.form.docAttachment.lastIndexOf("/")+1);
+          }
+          this.myFontData = response.data.processKey;
+
+          this.open = true
+          this.readonly = true
+          this.title = '申请详情';
+
+
+          if(this.myFontData ==='notice' || this.myFontData === 'notice_internal'){
+            this.myFontDocRemark = response.data.docRemark;
+          }
+
+        })
+
+      },
+      handleRemove(file, fileList) {
+        console.log(file, fileList);
+      },
+      handlePreview(file) {
+        console.log(file);
+      },
+      handleExceed(files, fileList) {
+        this.$message.warning(`当前限制选择 1 个文件，本次选择了 ${files.length} 个文件，共选择了 ${files.length + fileList.length} 个文件`);
+      },
+      fileSuccess(response,file,fileList){
+        this.form.docAttachment = response.fileUrl;
+        console.log('上传成功之后',response)
+      },
+      fileSuccess1(response,file,fileList){
+        this.annexUrl = response.fileUrl;
+        this.annexName = file.name;
+        console.log('和客户',response.fileUrl)
+        if(response.code!==200){
+          this.$message.error('上传失败!');
+        }
+      },
+      handleBeforeUpload(file) {
+        let extension = file.name.split(".")[1];
+        let extensionList = ["pdf", "doc", "docx"];
+        /* if (extensionList.indexOf(extension) < 0) {
+           this.$message.warning("只能上传PDF、Word文件");
+           return false;
+         }*/
+        const isLt50M = (file.size / 1024 / 1024) < 10;
+        if (!isLt50M) {
+          this.$message.error('上传文件大小不能超过 10MB!');
+          return false;
+        }
+        console.log(file);
+      },
+      /** 提交按钮 */
+      submitForm() {
+        this.$refs['form'].validate(valid => {
+          if (valid) {
+            if (this.form.id != null) {
+              updateLeave(this.form).then(response => {
+                if (response.code === 200) {
+                  this.msgSuccess('修改成功')
+                  this.open = false;
+                  this.getList()
+                }
+              })
+            } else {
+              addLeave(this.form).then(response => {
+                if (response.code === 200) {
+                  this.msgSuccess('新增成功')
+                  this.open = false;
+                  this.getList()
+                }
+              })
+            }
+          }
+        })
+      },
+      /** 删除按钮操作 */
+      handleDelete(row) {
+        const ids = row.id || this.ids
+        this.$confirm('是否确认删除请假流程编号为"' + ids + '"的数据项?', '警告', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }).then(function () {
+          return delLeave(ids)
+        }).then(() => {
+          this.getList()
+          this.msgSuccess('删除成功')
+        }).catch(function () {
+        })
+      },
+      /** 导出按钮操作 */
+      handleExport() {
+        const queryParams = this.queryParams
+        this.$confirm('是否确认导出所有请假流程数据项?', '警告', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }).then(function () {
+          return exportLeave(queryParams)
+        }).then(response => {
+          this.download(response.msg)
+        }).catch(function () {
+        })
+      },
+      showProcessImgDialog(row) {
+        this.processImg = true
+        this.instanceId = row.instanceId
+      },
+      handleSelectChange(val) {
+        console.log(this.form.processParams.B_deptLeaderApproved)
+        this.$forceUpdate()
+      },
+      finishFile(){
+        finishArchive(this.rowId).then(res =>{
+          if(res.code === 200){
+            this.showFinishFile = true;
+            this.msgSuccess('归档成功');
+          }else{
+            this.$message({
+              message: res.msg,
+              type: 'warning'
+            });
+          }
+        })
+      },
+      carryTime(date) {
+        if (date.getMinutes() > 0 && date.getMinutes() < 15) {
+          date.setMinutes(0);
+        }
+        if (date.getMinutes() >= 15 && date.getMinutes() < 30) {
+          date.setMinutes(30);
+        }
+        if (date.getMinutes() > 30 && date.getMinutes() < 45) {
+          date.setMinutes(30);
+        }
+        if (date.getMinutes() >= 45) {
+          date.setHours(date.getHours() + 1);
+          date.setMinutes(0);
+        }
+        return date;
+      },
+      DateDiffNoWeekDay(startTime, endTime) {
+        if (startTime >= endTime) return 0;
+        //1,分钟取整
+        startTime = this.carryTime(startTime);
+        endTime = this.carryTime(endTime);
+        //2，计算总天数
+        var totalTime = 0;//工时，天数
+        if (startTime.getDay() == 6 || startTime.getDay() == 0) {
+          totalTime = endTime.getDate() - startTime.getDate();
+        } else {
+          totalTime = Math.floor(((endTime - startTime) / (3600 * 1000)) / 24);
+        }
+        //3,拿初始值赋值给一个临时变量
+        var tempStartTime = new Date();
+        tempStartTime.setTime(startTime.getTime());
+        //4,计算出总天数
+        while (tempStartTime.getDate() < endTime.getDate()) {
+          if (tempStartTime.getDay() == 6 || tempStartTime.getDay() == 0) {//周六或者周日减去
+            totalTime--;
+          }
+          tempStartTime.setDate(tempStartTime.getDate() + 1);
+        }
+
+        //5,计算出总小时数
+        var temp = 0;//工时，小时
+        do {
+          if (startTime.getDay() == 6 || startTime.getDay() == 0) {//周六周日
+            startTime.setDate(startTime.getDate() + 1);
+            //*********周六周日直接跳过，初始化为早晨8点
+            startTime.setHours(8);
+            startTime.setMinutes(0);
+            continue;
+          }
+
+          let tempMinutes = startTime.getHours() * 60 + startTime.getMinutes();
+          //上午8点到12点，算工时
+          if (tempMinutes >= 8 * 60 && tempMinutes < 12 * 60) {
+            temp += 0.05;
+          }
+          //上午14点半到17点半，算工时
+          if (tempMinutes >= (14 * 60 + 30) && tempMinutes < (17 * 60 + 30)) {
+            temp += 0.05;
+          }
+          startTime.setTime(startTime.getTime() + 0.5 * 3600 * 1000);//每次增加半个小时
+        } while (startTime.getHours() * 60 + startTime.getMinutes() != endTime.getHours() * 60 + endTime.getMinutes())
+        {
+
+          totalTime += Math.floor(temp / 0.7);
+          totalTime += temp % 0.7;
+          totalTime = Math.round(totalTime * 100) / 100
+        }
+        var days = Math.floor(totalTime);
+        var hours = Math.round((totalTime - days) * 100) / 10;
+        var mm = days + '天'+ hours + '小时';
+        return mm;
+      },
+      DateDiffNoWeekDay1(startTime, endTime) {
+        if (startTime >= endTime) return 0;
+        //1,分钟取整
+        startTime = this.carryTime(startTime);
+        endTime = this.carryTime(endTime);
+        //2，计算总天数
+        var totalTime = 0;//工时，天数
+        if (startTime.getDay() == 6 || startTime.getDay() == 0) {
+          totalTime = endTime.getDate() - startTime.getDate();
+        } else {
+          totalTime = Math.floor(((endTime - startTime) / (3600 * 1000)) / 24);
+        }
+        //3,拿初始值赋值给一个临时变量
+        var tempStartTime = new Date();
+        tempStartTime.setTime(startTime.getTime());
+        //4,计算出总天数
+        while (tempStartTime.getDate() < endTime.getDate()) {
+          if (tempStartTime.getDay() == 6 || tempStartTime.getDay() == 0) {//周六或者周日减去
+            totalTime--;
+          }
+          tempStartTime.setDate(tempStartTime.getDate() + 1);
+        }
+
+        //5,计算出总小时数
+        var temp = 0;//工时，小时
+        do {
+          if (startTime.getDay() == 6 || startTime.getDay() == 0) {//周六周日
+            startTime.setDate(startTime.getDate() + 1);
+            //*********周六周日直接跳过，初始化为早晨8点
+            startTime.setHours(8);
+            startTime.setMinutes(0);
+            continue;
+          }
+
+          let tempMinutes = startTime.getHours() * 60 + startTime.getMinutes();
+          //上午8点到12点，算工时
+          if (tempMinutes >= 8 * 60 && tempMinutes < 12 * 60) {
+            temp += 0.05;
+          }
+          //下午15点到18点，算工时
+          if (tempMinutes >= 15 * 60 && tempMinutes < 18 * 60) {
+            temp += 0.05;
+          }
+          startTime.setTime(startTime.getTime() + 0.5 * 3600 * 1000);//每次增加半个小时
+        } while (startTime.getHours() * 60 + startTime.getMinutes() != endTime.getHours() * 60 + endTime.getMinutes())
+        {
+
+          totalTime += Math.floor(temp / 0.7);
+          totalTime += temp % 0.7;
+          totalTime = Math.round(totalTime * 100) / 100
+        }
+        var days = Math.floor(totalTime);
+        var hours = Math.round((totalTime - days) * 100) / 10;
+        var mm = days + '天'+ hours + '小时';
+        return mm;
+      }
+    },
+    watch: {
+      startAndEndTime: {
+        handler(newValue) {
+          this.form.leaveStartTime = newValue[0]
+          this.form.leaveEndTime = newValue[1]
+          if (newValue[0] && newValue[1]) {
+            this.form.totalTime = calcTotalSecond(newValue[0], newValue[1])
+            let month = parseInt(newValue[0].substr(5,2));
+            let returndata = '';
+            if(month <10 && month>4){
+              returndata = this.DateDiffNoWeekDay(new Date(newValue[0]), new Date(newValue[1]))
+            }else{
+              returndata = this.DateDiffNoWeekDay1(new Date(newValue[0]), new Date(newValue[1]))
+            }
+
+            this.formatDateSub = returndata
+          }
+
+        },
+        deep: true
+      },
+      checkList:{
+        handler(newValue) {
+          console.log('很厉害了多少',newValue)
+        }
+      }
+    }
+  }
+
+</script>
+<style lang="scss" scoped>
+  .myCascader{
+   /* display: inline-block;
+    display:none*/
+  }
+
+ /deep/.el-table--striped .el-table__body tr.el-table__row--striped td {
+   background: #F1FAFA;
+   /*background: 	#F1FAFA;*/
+   /*background: #A0EEE1;*/
+ }
+
+</style>

@@ -1,0 +1,659 @@
+<template>
+  <div class="app-container">
+    <el-form :model="queryParams" ref="queryForm" :inline="true" v-show="showSearch" label-width="68px">
+      <!--<el-form-item label="活动类型" prop="type">
+        <el-select v-model="queryParams.type" placeholder="请选择活动类型" clearable size="small">
+          <el-option label="请选择会议类型" value=""/>
+        </el-select>
+      </el-form-item>-->
+      <el-form-item label="活动标题" prop="title">
+        <el-input
+          v-model="queryParams.title"
+          placeholder="请输入活动标题"
+          clearable
+          size="small"
+          @keyup.enter.native="handleQuery"
+        />
+      </el-form-item>
+
+      <el-form-item label="是否完成" prop="type">
+        <el-select v-model="queryParams.isComplete" placeholder="请选择" clearable size="small">
+          <el-option label="未完成" value="0"/>
+          <el-option label="已完成" value="1"/>
+        </el-select>
+      </el-form-item>
+      <el-form-item>
+        <el-button type="cyan" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
+        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
+      </el-form-item>
+    </el-form>
+
+    <el-row :gutter="10" class="mb8" v-if="path=='advice'">
+      <el-col :span="1.5">
+        <el-button
+          type="primary"
+          icon="el-icon-plus"
+          size="mini"
+          @click="handleAdd"
+          v-hasPermi="['meeting:advice:add']"
+        >新增
+        </el-button>
+      </el-col>
+      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
+    </el-row>
+
+    <el-table v-loading="loading" :data="leaveList" stripe border :header-cell-style="{background:'#336699',color:'#eef1f6'}">
+      <el-table-column label="活动标题" align="center" prop="title"/>
+      <el-table-column label="简述" align="center" prop="display"/>
+      <el-table-column label="是否完成" align="center" prop="status"/>
+
+      <el-table-column label="预计结束时间" align="center" prop="endTime"/>
+
+      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+        <template slot-scope="scope">
+          <div>
+            <el-button
+              v-if="scope.row.isComplete === 1"
+              size="mini"
+              type="text"
+              icon="el-icon-edit"
+              @click="detail(scope.row)"
+            >查看详情
+            </el-button>
+            <el-button
+              v-if="scope.row.isComplete === 0"
+              size="mini"
+              type="text"
+              icon="el-icon-edit"
+              @click="openFinish(scope.row)"
+            >去完成
+            </el-button>
+          </div>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <pagination
+      v-show="total>0"
+      :total="total"
+      :page.sync="queryParams.pageNum"
+      :limit.sync="queryParams.pageSize"
+      @pagination="getList"
+    />
+
+    <!-- 添加或修改请假流程对话框 -->
+    <el-dialog :title="title" :visible.sync="open" width="40%" append-to-body>
+      <el-form ref="form" :model="form" :rules="addRules" label-width="120px">
+        <el-form-item label="活动标题" prop="title">
+          <el-input v-model="form.title" placeholder="请输入活动标题" :disabled='true' style="width: 50%"></el-input>
+        </el-form-item>
+        <el-form-item label="活动负责人" prop="activityCharger">
+          <el-input v-model="form.activityCharger"  :disabled='true' style="width: 50%"></el-input>
+        </el-form-item>
+        <el-form-item label="党支部名称" prop="branchName" >
+          <el-input v-model="form.branchName" placeholder="" :disabled='true' style="width: 50%"></el-input>
+        </el-form-item>
+
+
+        <el-form-item label="活动举办时间" prop="activityTime">
+          <el-input v-model="form.activityTime" placeholder="" :disabled='true' style="width: 50%"></el-input>
+        </el-form-item>
+        <el-form-item label="活动地点" prop="activityAdd">
+          <el-input v-model="form.activityAdd" :disabled="true" style="width: 50%">
+          </el-input>
+        </el-form-item>
+        <el-form-item label="活动内容" prop="activityContent">
+          <el-input type="textarea" :row="3" v-model="form.activityContent" :disabled="true" style="width: 80%">
+          </el-input>
+        </el-form-item>
+        <el-form-item label="活动图片" prop="activityImg">
+          <el-image :src="form.activityImg" style="width: 50%;height: 50%"></el-image>
+        </el-form-item>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button type="primary" @click="submitShowVerifyDialog" v-show="showButton">确 定</el-button>
+        <el-button type="primary" @click="submitForm" v-show=!readonly&&!showButton>确 定</el-button>
+        <el-button @click="cancel">取 消</el-button>
+      </div>
+    </el-dialog>
+
+<!--去完成-->
+    <el-dialog :title="title" :visible.sync="openToFinish" width="40%" append-to-body>
+      <el-form ref="form" :model="form" :rules="addRules" label-width="100px">
+        <el-form-item label="活动标题" prop="title">
+          <el-input v-model="form.title" placeholder="请输入活动标题" :disabled='true'></el-input>
+        </el-form-item>
+        <el-form-item label="活动负责人" prop="activityCharger">
+          <el-input v-model="form.activityCharger"  ></el-input>
+        </el-form-item>
+        <el-form-item label="党支部名称" prop="branchName" >
+          <el-input v-model="form.branchName" placeholder="" :disabled='true' ></el-input>
+        </el-form-item>
+        <el-form-item label="活动举办时间" prop="activityTime">
+          <!--<el-input v-model="form.activityTime" placeholder=""></el-input>-->
+          <el-date-picker
+            v-model="form.activityTime"
+            type="date"
+            placeholder="选择日期">
+          </el-date-picker>
+        </el-form-item>
+        <el-form-item label="活动地点" prop="activityAdd">
+          <el-input v-model="form.activityAdd" >
+          </el-input>
+        </el-form-item>
+        <el-form-item label="活动内容" prop="activityAdd">
+          <el-input type="textarea" :row="3" v-model="form.activityContent" >
+          </el-input>
+        </el-form-item>
+        <el-form-item label="活动图片" prop="activityImg">
+          <el-upload
+            class="upload-demo"
+            action="http://172.168.10.205:8082/ruoyi-admin/party/activity/file"
+            :on-preview="handlePreview"
+            :on-remove="handleRemove"
+            multiple
+            :limit="1"
+            accept=".png, .jpg"
+            :on-exceed="handleExceed"
+            :on-success="docFileSuccess"
+            :file-list="fileList">
+            <el-button size="small" type="primary">点击上传</el-button>
+            <div slot="tip" class="el-upload__tip">只能上传png、jpg文件，且不超过10MB</div>
+          </el-upload>
+        </el-form-item>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button type="primary" @click="toFinish">确 定</el-button>
+        <!--<el-button type="primary" @click="submitShowVerifyDialog" v-show="showButton">确 定</el-button>-->
+        <!--<el-button type="primary" @click="submitForm" v-show=!readonly&&!showButton>确 定</el-button>-->
+        <el-button @click="cancel">取 消</el-button>
+      </div>
+    </el-dialog>
+
+  </div>
+</template>
+
+<script>
+  /* import {
+     listLeave,
+     getLeave,
+     delLeave,
+     addLeave,
+     updateLeave,
+     exportLeave,
+     submitApply,
+     taskDoneList,
+     taskList,
+     meetList
+   } from '@/api/workflow/leave'*/
+  import {
+    meetList,addMeet,submitApply,taskList,getMeet,toFinishSubmit
+  } from '@/api/party/activity';
+  import {listUser} from '@/api/system/user';
+  import {cancelApply, suspendOrActiveApply, showVerifyDialog, complete} from '@/api/activiti/process'
+  import {calcTotalSecond, formatTotalDateSub} from '@/utils/dateUtil'
+  import ApprovalHistory from '@/components/activiti/approvalHistory'
+  import ProcessImg from '@/components/activiti/processImg'
+
+  export default {
+    components: {ApprovalHistory, ProcessImg},
+    name: 'Activity',
+    data() {
+      return {
+        fileList: [],
+        // 审批确定按钮
+        showButton: false,
+        // 审批人控制表单
+        showVerify: {
+          ModifyApply: false,
+          DeptLeaderVerify: false,
+          HrVerify: false,
+          ReportBack: false,
+          GetPeople: false,
+        },
+        // 路径
+        path: '',
+        // 查询方法
+        getLeaveList: null,
+
+        //流程图窗口开关
+        processImg: false,
+        //审批历史窗口开关
+        dialogTableVisible: false,
+        //历史审批窗口参数
+        instanceId: '',
+
+        // 请假时长
+        formatDateSub: '',
+        startAndEndTime: ['', ''],
+        readonly: false,
+        // 遮罩层
+        loading: true,
+        // 选中数组
+        ids: [],
+        // 非单个禁用
+        single: true,
+        // 非多个禁用
+        multiple: true,
+        // 显示搜索条件
+        showSearch: true,
+        // 总条数
+        total: 0,
+        // 请假流程表格数据
+        leaveList: [],
+        // 弹出层标题
+        title: '',
+        // 是否显示弹出层
+        open: false,
+        openToFinish:false,
+        //参会人
+        options:[],
+        peopOptions:[],
+        // 查询参数
+        queryParams: {
+          pageNum: 1,
+          pageSize: 10,
+          type: null,
+          title: null,
+          reason: null,
+          leaveStartTime: null,
+          leaveEndTime: null,
+          totalTime: null,
+          instanceId: null,
+          applyUser: null,
+          applyTime: null,
+          realityStartTime: null,
+          realityEndTime: null,
+          isComplete:null
+        },
+        // 表单参数
+        form: {
+          id:'',
+          meetTitle:'',
+          backups1:'',
+          processParams: {},
+          // peoples: [],
+          meetParticipants:'',
+          meetContent:''
+        },
+
+        // 表单校验
+        addRules: {
+          meetTitle: [
+            {required: true, message: '会议标题不能为空', trigger: 'blur'}
+          ],
+          /*startAndEndTime: [
+            {required: true, message: '会议时间不能为空', trigger: 'change'}
+          ],*/
+          backups1: [
+            { required: true, message: '负责人不能为空', trigger: 'change'}
+          ],
+          /*meetParticipants: [
+            {required: true, message: '参会人不能为空',}
+          ],*/
+          meetContent: [
+            {required: true, message: '会议主要内容不能为空', trigger: 'blur'}
+          ]
+        }
+      }
+    },
+    created() {
+      this.loading = false;
+      // this.getLeaveList = meetList
+      /*meetList().then(response => {
+        if (response.code === 200) {
+          this.getLeaveList = response.list
+        }
+      })*/
+      const path = this.$route.path.split('/').pop()
+      this.path = path
+      console.log(this.path)
+      // this.getLeaveList = meetList
+      if ('activity' == path) {
+        this.getLeaveList = meetList
+      } else if ('todo' == path) {
+        this.getLeaveList = taskList
+      } else if ('done' == path) {
+        this.getLeaveList = taskDoneList
+      }
+
+      this.getList()
+    },
+    methods: {
+      submitShowVerifyDialog() {
+        this.$refs['form'].validate(valid => {
+          if (valid) {
+            complete(this.form).then(response => {
+              if (response.code === 200) {
+                if (this.showVerify.ModifyApply) {
+                  updateLeave(this.form).then(response => {
+                    if (response.code === 200) {
+                      this.msgSuccess('修改成功')
+                      this.open = false
+                      this.getList()
+                    }
+                  })
+                } else {
+                  this.msgSuccess('操作成功')
+                  this.open = false
+                  this.getList()
+                }
+                this.reset()
+              }
+            })
+          }
+        })
+      },
+      // 审批菜单控制
+      showVerifyDialog(row) {
+        this.showButton = true
+        this.reset()
+        getMeet(row.id).then(response => {
+          this.form = response.data
+          this.startAndEndTime = [this.form.leaveStartTime, this.form.leaveEndTime]
+          showVerifyDialog(row.taskId).then(response => {
+            console.log(response.msg)
+            if ('ModifyApply' === response.msg) {
+              this.readonly = false
+              this.showVerify.ModifyApply = true;
+              this.form.processParams.B_reApply = "true";
+            } else {
+              if ('HrVerify' === response.msg) {
+                this.showVerify.HrVerify = true;
+                this.form.processParams.B_hrApproved = "true";
+              } else if ('DeptLeaderVerify' === response.msg) {
+                this.showVerify.DeptLeaderVerify = true;
+                this.form.processParams.B_deptLeaderApproved = "true";
+              } else if ('ReportBack' === response.msg) {
+                this.showVerify.ReportBack = true;
+              } else if ('Sign' === response.msg) {
+                this.form.processParams.B_peopleSign = "true";
+                this.showVerify.GetPeople = true;
+              }
+              this.readonly = true
+            }
+            this.open = true
+            this.title = row.taskName
+          })
+        })
+      },
+      /** 历史列表 */
+      historyList(row) {
+        this.dialogTableVisible = true
+        this.instanceId = row.instanceId
+      },
+      /** 查询请假流程列表 */
+      getList() {
+        this.loading = true
+        this.getLeaveList(this.queryParams).then(response => {
+          this.leaveList = response.rows
+          this.total = response.total
+          this.loading = false
+        })
+      },
+      // 取消按钮
+      cancel() {
+        this.open = false
+        this.dialogTableVisible = false
+        this.processImg = false
+        this.showButton = false
+        this.reset()
+
+      },
+      // 表单重置
+      reset() {
+        this.form = {
+          id: null,
+          type: null,
+          title: null,
+          reason: null,
+          leaveStartTime: null,
+          leaveEndTime: null,
+          totalTime: null,
+          instanceId: null,
+          createBy: null,
+          createTime: null,
+          updateBy: null,
+          updateTime: null,
+          applyUser: null,
+          applyTime: null,
+          realityStartTime: null,
+          realityEndTime: null,
+          processParams: {},
+        }
+        this.startAndEndTime = ['', '']
+        this.formatDateSub = null
+        this.resetForm('form')
+        this.instanceId = ''
+        this.showVerify = {
+          ModifyApply: false,
+          DeptLeaderVerify: false,
+          HrVerify: false,
+          ReportBack: false,
+        }
+      },
+      /** 搜索按钮操作 */
+      handleQuery() {
+        this.queryParams.pageNum = 1
+        this.getList()
+      },
+      /** 重置按钮操作 */
+      resetQuery() {
+        this.resetForm('queryForm')
+        this.handleQuery()
+      },
+      /** 新增按钮操作 */
+      handleAdd() {
+        this.reset()
+        this.open = true
+        listUser().then(res =>{
+          this.options = res.rows;
+          this.peopOptions = res.rows;
+        })
+        this.readonly = false
+        this.title = '申请会议'
+      },
+      /** 修改按钮操作 */
+      handleUpdate(row) {
+        this.reset()
+        getMeet(row.id).then(response => {
+          this.form = response.data
+          this.startAndEndTime = [this.form.leaveStartTime, this.form.leaveEndTime]
+          this.open = true
+          this.readonly = false
+          this.title = '修改请假流程'
+        })
+      },
+      submitApply(row) {
+        this.$confirm('确认要提交申请吗?', '警告', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }).then(function () {
+          return submitApply(row.id)
+        }).then(() => {
+          this.getList()
+          this.msgSuccess('提交成功')
+        }).catch(function () {
+        })
+      },
+      cancelApply(row) {
+        this.$confirm('确认要撤销申请吗?', '警告', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }).then(function () {
+          return cancelApply(row.instanceId)
+        }).then(() => {
+          this.getList()
+          this.msgSuccess('撤销成功')
+        }).catch(function () {
+        })
+      },
+      suspendOrActiveApply(row) {
+        var suspendOrActive = row.suspendState === '2' ? '激活' : '挂起'
+        this.$confirm('确认要' + suspendOrActive + '申请吗?', '警告', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }).then(function () {
+          const data = {'instanceId': row.instanceId, 'suspendState': row.suspendState}
+          return suspendOrActiveApply(data)
+        }).then(() => {
+          this.getList()
+          this.msgSuccess('撤销成功')
+        }).catch(function () {
+        })
+      },
+      /** 表单数据展示 */
+      detail(row) {
+        this.reset()
+        getMeet(row.id).then(response => {
+          this.form = response.data
+          this.startAndEndTime = [this.form.leaveStartTime, this.form.leaveEndTime]
+          this.open = true
+          this.readonly = true
+          this.title = '申请详情'
+        })
+      },
+      openFinish(row){
+        this.reset();
+        this.openToFinish = true;
+        this.open = false;
+        this.form.id = row.id;
+        getMeet(row.id).then(response => {
+          this.form = response.data
+          this.startAndEndTime = [this.form.leaveStartTime, this.form.leaveEndTime]
+          this.readonly = true
+          this.title = '去完成'
+        })
+      },
+      toFinish(){
+        toFinishSubmit(this.form).then(response => {
+          if (response.code === 200) {
+            this.msgSuccess('修改成功')
+            this.openToFinish = false
+            this.getList()
+          }
+        })
+      },
+      handleRemove(file, fileList) {
+        console.log(file, fileList);
+      },
+      handlePreview(file) {
+        console.log(file);
+      },
+      handleExceed(files, fileList) {
+        this.$message.warning(`当前限制选择 1 个文件，本次选择了 ${files.length} 个文件，共选择了 ${files.length + fileList.length} 个文件`);
+      },
+      fileSuccess(response,file,fileList){
+        this.form.activityImg = response.fileUrl;
+        console.log('上传成功之后',response)
+      },
+      docFileSuccess(response,file,fileList){
+        this.form.activityImg = response.fileUrl;
+        if(response.code!==200){
+          this.$message.error('上传失败!');
+        }
+      },
+      /** 提交按钮 */
+      submitForm() {
+        this.$refs['form'].validate(valid => {
+          /*if (valid) {
+            if (this.form.id != null) {
+              updateLeave(this.form).then(response => {
+                if (response.code === 200) {
+                  this.msgSuccess('修改成功')
+                  this.open = false
+                  this.getList()
+                }
+              })
+            } else {
+              addLeave(this.form).then(response => {
+                if (response.code === 200) {
+                  this.msgSuccess('新增成功')
+                  this.open = false
+                  this.getList()
+                }
+              })
+            }
+          }*/
+          let meetParticipants = '';
+          for(let i = 0;i<this.form.peoples.length;i++){
+            meetParticipants += this.form.peoples[i] +','
+          }
+          this.form.meetParticipants = meetParticipants.substring(0,meetParticipants.length-1);
+
+          addMeet(this.form).then(response => {
+            /*if (response.code === 200) {
+              this.msgSuccess('修改成功')
+              this.open = false
+              this.getList()
+            }*/
+          })
+        })
+      },
+      /** 删除按钮操作 */
+      handleDelete(row) {
+        const ids = row.id || this.ids
+        this.$confirm('是否确认删除会议编号为"' + ids + '"的数据项?', '警告', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }).then(function () {
+          return delLeave(ids)
+        }).then(() => {
+          this.getList()
+          this.msgSuccess('删除成功')
+        }).catch(function () {
+        })
+      },
+      /** 导出按钮操作 */
+      handleExport() {
+        const queryParams = this.queryParams
+        this.$confirm('是否确认导出所有请假流程数据项?', '警告', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }).then(function () {
+          return exportLeave(queryParams)
+        }).then(response => {
+          this.download(response.msg)
+        }).catch(function () {
+        })
+      },
+      showProcessImgDialog(row) {
+        this.processImg = true
+        this.instanceId = row.instanceId
+      },
+      handleSelectChange(val) {
+        console.log(this.form.processParams.B_deptLeaderApproved)
+        this.$forceUpdate()
+      }
+    },
+    watch: {
+      startAndEndTime: {
+        handler(newValue) {
+          // this.form.leaveStartTime = newValue[0]
+          // this.form.leaveEndTime = newValue[1]
+          this.form.meetStartTime = newValue[0]
+          this.form.meetEndTime = newValue[1]
+          if (newValue[0] && newValue[1]) {
+            this.form.totalTime = calcTotalSecond(newValue[0], newValue[1])
+            this.formatDateSub = formatTotalDateSub(this.form.totalTime)
+          }
+
+        },
+        deep: true
+      }
+    }
+  }
+
+</script>
+<style lang="scss" scoped>
+  /deep/.el-table--striped .el-table__body tr.el-table__row--striped td {
+    background: #F1FAFA;
+    /*background: 	#F1FAFA;*/
+    /*background: #A0EEE1;*/
+  }
+</style>
